@@ -12,6 +12,8 @@ using System.Windows.Ink;
 using System.Windows.Media;
 using System.Drawing;
 using Color = System.Windows.Media.Color;
+using System.Threading;
+using System.Diagnostics;
 
 namespace PaperPDF
 {
@@ -50,6 +52,7 @@ namespace PaperPDF
             }
 
             pdf = new MuPdf(file_path);
+            ThreadPool.SetMaxThreads(1, 1);
             // read note data
             if (File.Exists(note_path))
             {
@@ -202,15 +205,26 @@ namespace PaperPDF
         }
 
         double render_zoom = 1;
-        public async Task LoadPage((Image, Image) image, int i)
+
+        private static Semaphore renderMutex = new Semaphore(1, 1);
+        public async void LoadPage((Image, Image) image, int i)
         {
             if (!pdf.pages[i].loading)
             {
                 pdf.pages[i].loading = true;
-                var bitmap = pdf.RenderAPage(i, (float)render_zoom);
+
+                
+                var bitmap = await Task.Run(() =>
+                {
+                    renderMutex.WaitOne();
+                    // 不用信号量会内存访问冲突而导致崩溃
+                    var res = pdf.RenderAPage(i, (float)render_zoom);
+                    renderMutex.Release();
+                    return res;
+                });
+               
 
                 var bimage = await Task.Run(() => toBitmapImage(bitmap.Top, i));
-
                 image.Item1.Source = bimage;
                 var bimage2 = await Task.Run(() => toBitmapImage(bitmap.Bottom, i));
                 image.Item2.Source = bimage2;
@@ -253,7 +267,6 @@ namespace PaperPDF
 
         public void CheckInView(double topoffset, double viewHeight)
         {
-
             var range = FindPage(topoffset, viewHeight);
             if (range[0] - 1 >= 0) range[0]--;
             if (range[1] + 1 < pdf.pages.Count) range[1]++;
@@ -282,7 +295,6 @@ namespace PaperPDF
                 pdf.pages[i].unload = true;
             }
             pdf.dirt = false;
-
         }
 
         public (Image Top, Image Bottom) GetImageWithPage(int page)
@@ -612,7 +624,7 @@ namespace PaperPDF
             MainInkCanvas.EditingMode = InkCanvasEditingMode.None;
         }
 
-      
+
     }
 
     class InkNoteSaveData

@@ -22,7 +22,7 @@ namespace PaperPDF
     /// </summary>
     public partial class MainWindow : Window
     {
-        string file_path = "F://BaiduNetdiskDownload//考研英语一历年真题//英语一真题//真题集（纯真题PDF版）//2019考研英语（一)真题.pdf";
+        string file_path = "C://Users//Administrator//Desktop//文字文稿1.pdf";
         string note_path => file_path + ".notes";
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();
         Setting setting;
@@ -309,7 +309,7 @@ namespace PaperPDF
 
         public int[] FindPage(double offset, double viewHeight)
         {
-            var res = new int[2] { int.MaxValue, 0 };
+            var res = new int[2] { 0, 0 };
             var Pages = pdf.pages;
 
             for (int i = 0; i < Pages.Count; i++)

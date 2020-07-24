@@ -12,30 +12,25 @@
         <hc:ScrollViewer 
                 x:Name="scrollViewer"
                 PanningMode="Both" 
-                ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                HorizontalScrollBarVisibility="Auto"
                 ScrollChanged="scrollViewer_ScrollChanged"
                 IsManipulationEnabled="True"
                 IsInertiaEnabled="True"
                 MouseLeftButtonDown="scrollViewer_MouseLeftButtonDown"
                 MouseLeftButtonUp="scrollViewer_MouseLeftButtonUp"
                 MouseMove="scrollViewer_MouseMove"
-                CanMouseWheel="True"
-            
+                CanMouseWheel="True"            
             >
-            <UniformGrid x:Name="PdfGrid" VerticalAlignment="Top" Columns="1" 
-                         MouseLeave="PdfGrid_MouseLeave"  
-                         >
+            <UniformGrid 
+                x:Name="PdfGrid" 
+                VerticalAlignment="Top" 
+                Columns="1" 
+                MouseLeave="PdfGrid_MouseLeave">
                 <InkCanvas x:Name="MainInkCanvas" Width="1000" Loaded="MainInkCanvas_Loaded" MouseLeftButtonDown="MainInkCanvas_MouseLeftButtonDown" MouseLeftButtonUp="MainInkCanvas_MouseLeftButtonUp">
                 </InkCanvas>
             </UniformGrid>
         </hc:ScrollViewer>
-        <ToolBar VerticalAlignment="Top" HorizontalAlignment="Center">
-            <Button x:Name="PreButton" Content="上一个" Click="Button_Click"></Button>
-            <Button x:Name="NextButton" Content="下一个" Click="Button_Click_1"></Button>
-            <Button Content="荧光笔" Click="Button_Click_5"></Button>
-            <Button Content="黑笔" Click="Button_Click_2"></Button>
-            <Button Content="红笔" Click="Button_Click_3"></Button>
-            <Button Content="橡皮" Click="Button_Click_4"></Button>
+        <ToolBar x:Name="toolBar" VerticalAlignment="Top" HorizontalAlignment="Center">
         </ToolBar>
     </Grid>
 </Window>

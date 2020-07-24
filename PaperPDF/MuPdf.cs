@@ -12,17 +12,20 @@ namespace PaperPDF
         public IntPtr pagePtr;
         public int ID;
         public float width, height;
-        public double scale;
         public double Top;
         public bool loading;
         public bool unload;
     }
     class MuPdf
     {
+        public double last_render_zoom;
+        public bool dirt;
+
         IntPtr ctx;
         IntPtr doc;
         IntPtr stm;
         public List<PageRef> pages;
+        public double scale;
         public MuPdf(string path)
         {
             pages = new List<PageRef>();
@@ -33,7 +36,7 @@ namespace PaperPDF
             doc = NativeMethods.OpenDocumentStream(ctx, ".pdf", stm); // 从文件流创建文档对象
             int pn = NativeMethods.CountPages(ctx, doc); // 获取文档的页数
             for (int i = 0; i < pn; i++)
-            { 
+            {
                 // 遍历各页
                 IntPtr p = NativeMethods.LoadPage(ctx, doc, i); // 加载页面（首页为 0）
                 Rectangle b = NativeMethods.BoundPage(ctx, p); // 获取页面尺寸
@@ -49,9 +52,9 @@ namespace PaperPDF
             }
         }
 
-        public Bitmap RenderAPage(int pageID)
+        public (Bitmap Top, Bitmap Bottom) RenderAPage(int pageID, float zoom)
         {
-            return RenderPage(ctx, doc, pages[pageID].pagePtr, pages[pageID].scale, 2);
+            return RenderPage(ctx, doc, pages[pageID].pagePtr, scale, 2 * zoom);
         }
 
         ~MuPdf()
@@ -66,7 +69,7 @@ namespace PaperPDF
             NativeMethods.FreeContext(ctx);
         }
 
-        static Bitmap RenderPage(IntPtr context, IntPtr document, IntPtr page, double scale, double zoom)
+        static (Bitmap top, Bitmap bottom) RenderPage(IntPtr context, IntPtr document, IntPtr page, double scale, double zoom)
         {
             Matrix ctm = new Matrix();
             IntPtr pix = IntPtr.Zero;
@@ -86,16 +89,41 @@ namespace PaperPDF
             int height = NativeMethods.fz_pixmap_height(context, pix);
 
             // 创建与 Pixmap 相同尺寸的彩色 Bitmap
-            Bitmap bmp = new Bitmap(width, height, PixelFormat.Format24bppRgb);
-            var imageData = bmp.LockBits(new System.Drawing.Rectangle(0, 0,
-                              width, height), ImageLockMode.ReadWrite, bmp.PixelFormat);
 
+
+            var half_h = height / 2;
+            Bitmap bmp = new Bitmap(width, half_h, PixelFormat.Format24bppRgb);
+            Bitmap bmp2 = new Bitmap(width, height - half_h, PixelFormat.Format24bppRgb);
+
+            var imageData = bmp.LockBits(new System.Drawing.Rectangle(0, 0,
+                              width, half_h), ImageLockMode.ReadWrite, bmp.PixelFormat);
+            var imageData2 = bmp2.LockBits(new System.Drawing.Rectangle(0, 0,
+                            width, height - half_h), ImageLockMode.ReadWrite, bmp.PixelFormat);
             unsafe
             { // 将 Pixmap 的数据转换为 Bitmap 数据
               // 获取  的图像数据
                 byte* ptrSrc = (byte*)NativeMethods.GetSamples(context, pix);
                 byte* ptrDest = (byte*)imageData.Scan0;
-                for (int y = 0; y < height; y++)
+                for (int y = 0; y < half_h; y++)
+                {
+                    byte* pl = ptrDest;
+                    byte* sl = ptrSrc;
+                    for (int x = 0; x < width; x++)
+                    {
+                        // 将 Pixmap 的色彩数据转换为 Bitmap 的格式
+                        pl[2] = sl[0]; //b-r
+                        pl[1] = sl[1]; //g-g
+                        pl[0] = sl[2]; //r-b
+                                       //sl[3] 是透明通道数据，在此忽略
+                        pl += 3;
+                        sl += 3;
+                    }
+                    ptrDest += imageData.Stride;
+                    ptrSrc += width * 3;
+                }
+
+                ptrDest = (byte*)imageData2.Scan0;
+                for (int y = half_h; y < height; y++)
                 {
                     byte* pl = ptrDest;
                     byte* sl = ptrSrc;
@@ -113,8 +141,10 @@ namespace PaperPDF
                     ptrSrc += width * 3;
                 }
             }
+
+
             NativeMethods.DropPixmap(context, pix); // 释放 Pixmap 占用的资源
-            return bmp;
+            return (bmp, bmp2);
         }
     }
 

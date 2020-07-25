@@ -7,6 +7,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Platforms>AnyCPU;x86</Platforms>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
+    <Version>1.0.1</Version>
+    <PackageProjectUrl>https://github.com/dicarne/PaperPDF</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dicarne/PaperPDF.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

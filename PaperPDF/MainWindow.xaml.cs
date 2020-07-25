@@ -22,7 +22,7 @@ namespace PaperPDF
     /// </summary>
     public partial class MainWindow : Window
     {
-        string file_path = "C://Users//Administrator//Desktop//文字文稿1.pdf";
+        string file_path = "";
         string note_path => file_path + ".notes";
         string dir;
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();
@@ -71,7 +71,7 @@ namespace PaperPDF
 
             string[] command = Environment.GetCommandLineArgs();//获取进程命令行参数
 
-    
+
 
             scrollViewer.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(scrollViewer_MouseLeftButtonDown), true);
             scrollViewer.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(scrollViewer_MouseLeftButtonUp), true);
@@ -149,7 +149,7 @@ namespace PaperPDF
             MainInkCanvas.Width = render_zoom * 1000;
             MainInkCanvas.Height = top;
 
-            
+
 
             ApplySchema();
         }
@@ -239,13 +239,22 @@ namespace PaperPDF
                 var bitmap = await Task.Run(() =>
                 {
                     renderMutex.WaitOne();
+                    if (pdf.pages[i].unload)
+                    {
+                        renderMutex.Release();
+                        return (null, null);
+                    }
                     // 不用信号量会内存访问冲突而导致崩溃
                     var res = pdf.RenderAPage(i, (float)render_zoom);
                     renderMutex.Release();
                     return res;
                 });
 
-
+                if(bitmap.Top == null)
+                {
+                    pdf.pages[i].loading = false;
+                    return;
+                }
                 var bimage = await Task.Run(() => toBitmapImage(bitmap.Top, i));
                 image.Item1.Source = bimage;
                 var bimage2 = await Task.Run(() => toBitmapImage(bitmap.Bottom, i));

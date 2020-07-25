@@ -13,7 +13,7 @@ using System.Windows.Media;
 using System.Drawing;
 using Color = System.Windows.Media.Color;
 using System.Threading;
-using System.Diagnostics;
+using System.Reflection;
 
 namespace PaperPDF
 {
@@ -24,12 +24,54 @@ namespace PaperPDF
     {
         string file_path = "C://Users//Administrator//Desktop//文字文稿1.pdf";
         string note_path => file_path + ".notes";
+        string dir;
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();
         Setting setting;
+        private SynchronizationContext Context { get; set; }
         public MainWindow()
         {
             InitializeComponent();
 
+            dir = System.Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var orgdir = Path.Combine(dir, "PaperPDF");
+            if (!Directory.Exists(orgdir)) Directory.CreateDirectory(orgdir);
+            dir = orgdir;
+
+            if (File.Exists(Path.Combine(dir, "paper_pdf_config.yaml")))
+            {
+                try
+                {
+                    setting = new Deserializer().Deserialize<Setting>(File.ReadAllText(Path.Combine(dir, "paper_pdf_config.yaml")));
+                }
+                catch (Exception)
+                {
+                    setting = Setting.Default();
+                    var result = MessageBox.Show("是否重置配置文件（否则退出）？", "PaperPDF配置文件错误", MessageBoxButton.YesNo);
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        if (File.Exists(Path.Combine(dir, "paper_pdf_config.old.yaml"))) File.Delete(Path.Combine(dir, "paper_pdf_config.old.yaml"));
+                        File.Move(Path.Combine(dir, "paper_pdf_config.yaml"), Path.Combine(dir, "paper_pdf_config.old.yaml"));
+                        File.WriteAllText(Path.Combine(dir, "paper_pdf_config.yaml"), new Serializer().Serialize(setting));
+                    }
+                    else
+                    {
+                        Application.Current.Shutdown();
+                        return;
+                    }
+
+                }
+            }
+            else
+            {
+                setting = Setting.Default();
+                File.WriteAllText(Path.Combine(dir, "paper_pdf_config.yaml"), new Serializer().Serialize(setting));
+            }
+
+            Context = SynchronizationContext.Current;
+
+            string[] command = Environment.GetCommandLineArgs();//获取进程命令行参数
+
+    
 
             scrollViewer.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(scrollViewer_MouseLeftButtonDown), true);
             scrollViewer.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(scrollViewer_MouseLeftButtonUp), true);
@@ -40,7 +82,6 @@ namespace PaperPDF
 
             MainInkCanvas.DefaultDrawingAttributes.FitToCurve = true;
 
-            string[] command = Environment.GetCommandLineArgs();//获取进程命令行参数
             if (command.Length > 1)
             {
                 file_path = command[1];
@@ -108,25 +149,7 @@ namespace PaperPDF
             MainInkCanvas.Width = render_zoom * 1000;
             MainInkCanvas.Height = top;
 
-            if (File.Exists("paper_pdf_config.yaml"))
-            {
-                try
-                {
-                    setting = new Deserializer().Deserialize<Setting>(File.ReadAllText("paper_pdf_config.yaml"));
-                }
-                catch (Exception)
-                {
-                    setting = Setting.Default();
-                    if (File.Exists("paper_pdf_config.old.yaml")) File.Delete("paper_pdf_config.old.yaml");
-                    File.Move("paper_pdf_config.yaml", "paper_pdf_config.old.yaml");
-                    File.WriteAllText("paper_pdf_config.yaml", new Serializer().Serialize(setting));
-                }
-            }
-            else
-            {
-                setting = Setting.Default();
-                File.WriteAllText("paper_pdf_config.yaml", new Serializer().Serialize(setting));
-            }
+            
 
             ApplySchema();
         }
@@ -174,7 +197,6 @@ namespace PaperPDF
             render_zoom = zoom;
             CheckInView(ver_offset_new, view_h);
 
-
         }
 
 
@@ -213,7 +235,7 @@ namespace PaperPDF
             {
                 pdf.pages[i].loading = true;
 
-                
+
                 var bitmap = await Task.Run(() =>
                 {
                     renderMutex.WaitOne();
@@ -222,12 +244,17 @@ namespace PaperPDF
                     renderMutex.Release();
                     return res;
                 });
-               
+
 
                 var bimage = await Task.Run(() => toBitmapImage(bitmap.Top, i));
                 image.Item1.Source = bimage;
                 var bimage2 = await Task.Run(() => toBitmapImage(bitmap.Bottom, i));
                 image.Item2.Source = bimage2;
+                if (pdf.pages[i].unload)
+                {
+                    image.Item1.Source = null;
+                    image.Item2.Source = null;
+                }
 
                 pdf.pages[i].loading = false;
             }
@@ -245,7 +272,16 @@ namespace PaperPDF
             }
             CheckPreButton();
             scrollViewer.ScrollToVerticalOffset(inkNoteSaveData.TopOffset);
+            saveTimer = new System.Timers.Timer(60 * 1000);
+            saveTimer.Elapsed += SaveTimer_Elapsed;
+            saveTimer.AutoReset = true;
+            saveTimer.Enabled = true;
+        }
 
+        System.Timers.Timer saveTimer;
+        private void SaveTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            Context.Post((e) => { Save(); }, 0);
         }
 
         Button PreButton;
@@ -390,6 +426,11 @@ namespace PaperPDF
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            Save();
+        }
+
+        void Save()
+        {
             inkNoteSaveData.TopOffset = scrollViewer.VerticalOffset;
             inkNoteSaveData.zoom = render_zoom;
             SaveStrokes();
@@ -398,9 +439,8 @@ namespace PaperPDF
 
         void SaveStrokes()
         {
-            var stokes = MainInkCanvas.Strokes;
             var stm = new MemoryStream();
-            stokes.Save(stm);
+            MainInkCanvas.Strokes.Save(stm);
             inkNoteSaveData.allnotes[inkNoteSaveData.Current].data = stm.ToArray();
             stm.Close();
         }
@@ -445,6 +485,7 @@ namespace PaperPDF
         {
             // earse
             MainInkCanvas.EditingMode = InkCanvasEditingMode.EraseByStroke;
+            CheckEditButton();
         }
 
         void onZoomIn(object sender, RoutedEventArgs e)
@@ -461,6 +502,17 @@ namespace PaperPDF
         }
 
         Button redonlyButton;
+        void CheckEditButton()
+        {
+            if (MainInkCanvas.EditingMode == InkCanvasEditingMode.None)
+            {
+                redonlyButton.Content = "绘制";
+            }
+            else
+            {
+                redonlyButton.Content = "只读";
+            }
+        }
         void ToggleCanvasReadonly(object sender, RoutedEventArgs e)
         {
             if (MainInkCanvas.EditingMode != InkCanvasEditingMode.None)
@@ -588,6 +640,7 @@ namespace PaperPDF
                             da.Width = 10;
                             MainInkCanvas.DefaultDrawingAttributes = da;
                             inkNoteSaveData.LastUsePenIndex = index;
+                            CheckEditButton();
                         };
                     button.Click += met;
                     if (index == inkNoteSaveData.LastUsePenIndex)
@@ -606,6 +659,7 @@ namespace PaperPDF
                             da.Color = (Color)System.Windows.Media.ColorConverter.ConvertFromString(item.Color);
                             MainInkCanvas.DefaultDrawingAttributes = da;
                             inkNoteSaveData.LastUsePenIndex = index;
+                            CheckEditButton();
                         };
                     button.Click += met;
                     if (index == inkNoteSaveData.LastUsePenIndex)

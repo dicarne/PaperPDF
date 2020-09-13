@@ -19,7 +19,8 @@
                 MouseLeftButtonDown="scrollViewer_MouseLeftButtonDown"
                 MouseLeftButtonUp="scrollViewer_MouseLeftButtonUp"
                 MouseMove="scrollViewer_MouseMove"
-                CanMouseWheel="True"            
+                CanMouseWheel="True"
+                Style="{StaticResource for_scrollviewer}"
             >
             <UniformGrid 
                 x:Name="PdfGrid" 
@@ -32,5 +33,11 @@
         </hc:ScrollViewer>
         <ToolBar x:Name="toolBar" VerticalAlignment="Top" HorizontalAlignment="Center">
         </ToolBar>
+        <Canvas x:Name="bookmarkCanvas" HorizontalAlignment="Right" Width="20">
+            <Canvas x:Name="allbookmarks"></Canvas>
+            <Canvas x:Name="currentBookmarks">
+                <Rectangle Width="20" Height="10" Fill="Black"></Rectangle>
+            </Canvas>
+        </Canvas>
     </Grid>
 </Window>

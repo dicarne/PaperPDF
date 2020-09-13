@@ -14,6 +14,8 @@ using System.Drawing;
 using Color = System.Windows.Media.Color;
 using System.Threading;
 using System.Reflection;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace PaperPDF
 {
@@ -22,7 +24,7 @@ namespace PaperPDF
     /// </summary>
     public partial class MainWindow : Window
     {
-        string file_path = "";
+        string file_path = @"F:\BaiduNetdiskDownload\考研英语一历年真题\英语一真题\真题集（纯真题PDF版）\1986—1995年历年考研英语真题集.pdf";
         string note_path => file_path + ".notes";
         string dir;
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();
@@ -79,6 +81,9 @@ namespace PaperPDF
             MainInkCanvas.AddHandler(MouseLeftButtonDownEvent, new MouseButtonEventHandler(MainInkCanvas_MouseLeftButtonDown), true);
             MainInkCanvas.AddHandler(MouseLeftButtonUpEvent, new MouseButtonEventHandler(MainInkCanvas_MouseLeftButtonUp), true);
 
+            MainInkCanvas.SetEnabledGestures(new List<ApplicationGesture>() {
+                ApplicationGesture.Star
+            });
 
             MainInkCanvas.DefaultDrawingAttributes.FitToCurve = true;
 
@@ -89,7 +94,7 @@ namespace PaperPDF
             if (!file_path.EndsWith(".pdf"))
             {
                 MessageBox.Show("无法打开非PDF文件");
-                App.Current.Shutdown();
+                Application.Current.Shutdown();
             }
 
             pdf = new MuPdf(file_path);
@@ -153,6 +158,8 @@ namespace PaperPDF
 
             ApplySchema();
         }
+
+   
 
         void SetZoom(double zoom)
         {
@@ -379,6 +386,7 @@ namespace PaperPDF
             {
                 var top = e.VerticalOffset;
                 CheckInView(top, e.ViewportHeight);
+                CheckBookMark();
             }
 
         }
@@ -663,7 +671,7 @@ namespace PaperPDF
 
                         (object sender, RoutedEventArgs e) =>
                         {
-                            MainInkCanvas.EditingMode = InkCanvasEditingMode.Ink;
+                            MainInkCanvas.EditingMode = InkCanvasEditingMode.InkAndGesture;
                             var da = new DrawingAttributes();
                             da.Color = (Color)System.Windows.Media.ColorConverter.ConvertFromString(item.Color);
                             MainInkCanvas.DefaultDrawingAttributes = da;
@@ -685,9 +693,41 @@ namespace PaperPDF
             earse.Content = "橡皮";
             toolBar.Items.Add(earse);
             MainInkCanvas.EditingMode = InkCanvasEditingMode.None;
+
+            bookmark = new Button();
+            bookmark.Click += Bookmark_Click;
+            bookmark.Content = "添加书签";
+            toolBar.Items.Add(bookmark);
+        }
+        Button bookmark;
+        void CheckBookMark()
+        {
+            if (bookmark != null)
+            {
+                var viewh = scrollViewer.ViewportHeight;
+                var top = scrollViewer.VerticalOffset;
+                var totolH = scrollViewer.ExtentHeight;
+                var perS = top / totolH;
+                var perE = (top + viewh) / totolH;
+                if(inkNoteSaveData.bookMarks == null)
+                {
+                    inkNoteSaveData.bookMarks = new List<BookMarkData>();
+                }
+                currentBookmarks.Children.Clear();
+                for (int i = 0; i < inkNoteSaveData.bookMarks.Count; i++)
+                {
+                    if(inkNoteSaveData.bookMarks[i].hP >= perS && inkNoteSaveData.bookMarks[i].hP <= perE)
+                    {
+                        currentBookmarks.Children.Add(new System.Windows.Shapes.Rectangle() {  });
+                    }
+                }
+            }
         }
 
-
+        private void Bookmark_Click(object sender, RoutedEventArgs e)
+        {
+            CheckBookMark();
+        }
     }
 
     class InkNoteSaveData
@@ -698,6 +738,11 @@ namespace PaperPDF
         public string LastSchema;
         public int LastUsePenIndex;
         public List<InkNoteData> allnotes = new List<InkNoteData>();
+        public List<BookMarkData> bookMarks = new List<BookMarkData>();
+    }
+    class BookMarkData
+    {
+        public double hP;
     }
     class InkNoteData
     {

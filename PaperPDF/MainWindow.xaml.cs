@@ -157,6 +157,8 @@ namespace PaperPDF
 
 
             ApplySchema();
+
+            mainWindow.Title = Path.GetFileNameWithoutExtension(file_path);
         }
 
    
@@ -694,10 +696,10 @@ namespace PaperPDF
             toolBar.Items.Add(earse);
             MainInkCanvas.EditingMode = InkCanvasEditingMode.None;
 
-            bookmark = new Button();
-            bookmark.Click += Bookmark_Click;
-            bookmark.Content = "添加书签";
-            toolBar.Items.Add(bookmark);
+            //bookmark = new Button();
+            //bookmark.Click += Bookmark_Click;
+            //bookmark.Content = "添加书签";
+            //toolBar.Items.Add(bookmark);
         }
         Button bookmark;
         void CheckBookMark()
@@ -714,13 +716,13 @@ namespace PaperPDF
                     inkNoteSaveData.bookMarks = new List<BookMarkData>();
                 }
                 currentBookmarks.Children.Clear();
-                for (int i = 0; i < inkNoteSaveData.bookMarks.Count; i++)
-                {
-                    if(inkNoteSaveData.bookMarks[i].hP >= perS && inkNoteSaveData.bookMarks[i].hP <= perE)
-                    {
-                        currentBookmarks.Children.Add(new System.Windows.Shapes.Rectangle() {  });
-                    }
-                }
+                //for (int i = 0; i < inkNoteSaveData.bookMarks.Count; i++)
+                //{
+                //    if(inkNoteSaveData.bookMarks[i].hP >= perS && inkNoteSaveData.bookMarks[i].hP <= perE)
+                //    {
+                //        currentBookmarks.Children.Add(new System.Windows.Shapes.Rectangle() {  });
+                //    }
+                //}
             }
         }
 

@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
@@ -50,8 +51,66 @@ namespace PaperPDF
                     height = height
                 });
             }
+            unsafe
+            {
+                // 在此读取目录
+                fz_outline* ptr = NativeMethods.fz_load_outline(ctx, doc); ;
+                outlines = readOutline(ptr);
+            }
+            BindMetadata();
+
         }
 
+        /// <summary>
+        /// 读取目录
+        /// </summary>
+        /// <param name="ptr"></param>
+        /// <returns></returns>
+        unsafe List<OutlineIndex> readOutline(fz_outline* ptr)
+        {
+            var col = new List<OutlineIndex>();
+            while (ptr != null)
+            {
+                var obj = new OutlineIndex()
+                {
+                    page = ptr->page,
+                    x = ptr->x,
+                    y = ptr->y,
+                    refs = ptr->refs,
+                    title = ReadCStr(ptr->title),
+                    uri = ReadCStr(ptr->uri)
+                };
+
+                if (ptr->down != null)
+                {
+                    obj.down = readOutline(ptr->down);
+                }
+                col.Add(obj);
+                ptr = ptr->next;
+            }
+            return col;
+        }
+
+
+        unsafe string ReadCStr(byte* buf)
+        {
+            var str = new List<byte>(20);
+            while (*buf != 0)
+            {
+                str.Add(*buf);
+                buf++;
+            }
+            return Encoding.UTF8.GetString(str.ToArray());
+        }
+
+        public List<OutlineIndex> outlines = new();
+
+        /// <summary>
+        /// 渲染一页
+        /// </summary>
+        /// <param name="pageID"></param>
+        /// <param name="zoom"></param>
+        /// <returns></returns>
         public (Bitmap Top, Bitmap Bottom) RenderAPage(int pageID, float zoom)
         {
             return RenderPage(ctx, doc, pages[pageID].pagePtr, scale, 2 * zoom);
@@ -69,6 +128,15 @@ namespace PaperPDF
             NativeMethods.FreeContext(ctx);
         }
 
+        /// <summary>
+        /// 渲染一页
+        /// </summary>
+        /// <param name="context"></param>
+        /// <param name="document"></param>
+        /// <param name="page"></param>
+        /// <param name="scale"></param>
+        /// <param name="zoom"></param>
+        /// <returns></returns>
         static (Bitmap top, Bitmap bottom) RenderPage(IntPtr context, IntPtr document, IntPtr page, double scale, double zoom)
         {
             Matrix ctm = new Matrix();
@@ -146,7 +214,65 @@ namespace PaperPDF
             NativeMethods.DropPixmap(context, pix); // 释放 Pixmap 占用的资源
             return (bmp, bmp2);
         }
+
+        /// <summary>
+        /// Basic information:
+        /// 'format'	-- Document format and version.
+        /// 'encryption'	-- Description of the encryption used.
+        /// 
+        /// From the document information dictionary:
+		/// 'info:Title'
+		/// 'info:Author'
+		/// 'info:Subject'
+		/// 'info:Keywords'
+		/// 'info:Creator'
+		/// 'info:Producer'
+		/// 'info:CreationDate'
+		/// 'info:ModDate'
+        /// </summary>
+        /// <param name="key"></param>
+        string? lookupMetadate(string key)
+        {
+            unsafe
+            {
+                var buffsize = 1024;
+                byte* buf = stackalloc byte[buffsize];
+
+                var ak = Encoding.UTF8.GetBytes(key);
+                byte* keyp = stackalloc byte[ak.Length + 1];
+                for (int i = 0; i < ak.Length; i++)
+                {
+                    keyp[i] = ak[i];
+                }
+                keyp[ak.Length] = 0;
+
+                var len = NativeMethods.fz_lookup_metadata(ctx, doc, keyp, buf, buffsize);
+                if (len == -1) return null;
+                return ReadCStr(buf);
+            }
+        }
+        void BindMetadata()
+        {
+            Title = lookupMetadate("info:Title");
+            Author = lookupMetadate("info:Author");
+            Subject = lookupMetadate("info:Subject");
+            Keywords = lookupMetadate("info:Keywords");
+            Creator = lookupMetadate("info:Creator");
+            Producer = lookupMetadate("info:Producer");
+            CreationDate = lookupMetadate("info:CreationDate");
+            ModDate = lookupMetadate("info:ModDate");
+        }
+
+        public string? Title { get; private set; }
+        public string? Author { get; private set; }
+        public string? Subject { get; private set; }
+        public string? Keywords { get; private set; }
+        public string? Creator { get; private set; }
+        public string? Producer { get; private set; }
+        public string? CreationDate { get; private set; }
+        public string? ModDate { get; private set; }
     }
+   
 
 
     public struct BBox
@@ -161,6 +287,28 @@ namespace PaperPDF
     {
         public float A, B, C, D, E, F;
     }
+
+    public unsafe struct fz_outline
+    {
+        public int refs;
+        public byte* title;
+        public byte* uri;
+        public int page;
+        public float x, y;
+        public fz_outline* next;
+        public fz_outline* down;
+        public int is_open;
+    }
+    public class OutlineIndex
+    {
+        public int refs;
+        public string title;
+        public string uri;
+        public int page;
+        public float x, y;
+        public List<OutlineIndex>? down;
+    }
+
     class NativeMethods
     {
 
@@ -242,5 +390,13 @@ namespace PaperPDF
         public static extern int fz_pixmap_width(IntPtr doc, IntPtr pix);
         [DllImport(DLL, EntryPoint = "fz_pixmap_height")]
         public static extern int fz_pixmap_height(IntPtr doc, IntPtr pix);
+
+        [DllImport(DLL, EntryPoint = "fz_lookup_metadata")]
+        public static unsafe extern int fz_lookup_metadata(IntPtr ctx, IntPtr doc, byte* key, byte* buf, int size);
+
+        [DllImport(DLL, EntryPoint = "fz_load_outline")]
+        public static unsafe extern fz_outline* fz_load_outline(IntPtr ctx, IntPtr doc);
+
+
     }
 }

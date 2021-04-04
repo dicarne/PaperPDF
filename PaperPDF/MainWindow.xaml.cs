@@ -24,7 +24,8 @@ namespace PaperPDF
     /// </summary>
     public partial class MainWindow : Window
     {
-        string file_path = @"F:\BaiduNetdiskDownload\考研英语一历年真题\英语一真题\真题集（纯真题PDF版）\1986—1995年历年考研英语真题集.pdf";
+        string file_path = //@"F:\BaiduNetdiskDownload\考研英语一历年真题\英语一真题\真题集（纯真题PDF版）\1986—1995年历年考研英语真题集.pdf";
+            @"C:\Users\Administrator\OneDrive\vr\畸变矫正\论文1\An Exact Formula for Calculating Inverse Radial Lens Distortions.pdf";
         string note_path => file_path + ".notes";
         string dir;
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();

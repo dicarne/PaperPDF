@@ -13,9 +13,6 @@ using System.Windows.Media;
 using System.Drawing;
 using Color = System.Windows.Media.Color;
 using System.Threading;
-using System.Reflection;
-using System.Collections.ObjectModel;
-using System.Diagnostics;
 
 namespace PaperPDF
 {
@@ -24,8 +21,7 @@ namespace PaperPDF
     /// </summary>
     public partial class MainWindow : Window
     {
-        string file_path = //@"F:\BaiduNetdiskDownload\考研英语一历年真题\英语一真题\真题集（纯真题PDF版）\1986—1995年历年考研英语真题集.pdf";
-            @"C:\Users\Administrator\OneDrive\vr\畸变矫正\论文1\An Exact Formula for Calculating Inverse Radial Lens Distortions.pdf";
+        string file_path = null;
         string note_path => file_path + ".notes";
         string dir;
         InkNoteSaveData inkNoteSaveData = new InkNoteSaveData();
@@ -35,9 +31,13 @@ namespace PaperPDF
         {
             InitializeComponent();
 
-            dir = System.Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            var orgdir = Path.Combine(dir, "PaperPDF");
-            if (!Directory.Exists(orgdir)) Directory.CreateDirectory(orgdir);
+            dir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string orgdir = Path.Combine(dir, "PaperPDF");
+            if (!Directory.Exists(orgdir))
+            {
+                Directory.CreateDirectory(orgdir);
+            }
+
             dir = orgdir;
 
             if (File.Exists(Path.Combine(dir, "paper_pdf_config.yaml")))
@@ -92,7 +92,23 @@ namespace PaperPDF
             {
                 file_path = command[1];
             }
-            if (!file_path.EndsWith(".pdf"))
+            if (string.IsNullOrEmpty(file_path))
+            {
+                var dig = new Microsoft.Win32.OpenFileDialog
+                {
+                    DefaultExt = ".pdf",
+                    Title = "选择PDF文件"
+                };
+                if (dig.ShowDialog().Value)
+                {
+                    file_path = dig.FileName;
+                }
+                else
+                {
+                    Application.Current.Shutdown();
+                }
+            }
+            else if (!file_path.EndsWith(".pdf"))
             {
                 MessageBox.Show("无法打开非PDF文件");
                 Application.Current.Shutdown();
@@ -162,7 +178,7 @@ namespace PaperPDF
             mainWindow.Title = Path.GetFileNameWithoutExtension(file_path);
         }
 
-   
+
 
         void SetZoom(double zoom)
         {
@@ -260,7 +276,7 @@ namespace PaperPDF
                     return res;
                 });
 
-                if(bitmap.Top == null)
+                if (bitmap.Top == null)
                 {
                     pdf.pages[i].loading = false;
                     return;
@@ -712,7 +728,7 @@ namespace PaperPDF
                 var totolH = scrollViewer.ExtentHeight;
                 var perS = top / totolH;
                 var perE = (top + viewh) / totolH;
-                if(inkNoteSaveData.bookMarks == null)
+                if (inkNoteSaveData.bookMarks == null)
                 {
                     inkNoteSaveData.bookMarks = new List<BookMarkData>();
                 }
